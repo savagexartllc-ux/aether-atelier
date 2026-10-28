@@ -1,0 +1,10 @@
+{
+  // Must match the Worker's name in Cloudflare (Workers & Pages).
+  "name": "broken-mud-4e8f",
+  "compatibility_date": "2025-03-07",
+  // Serves everything in /public as the website. No server code needed.
+  "assets": {
+    "directory": "./public"
+  },
+  "observability": { "enabled": true }
+}

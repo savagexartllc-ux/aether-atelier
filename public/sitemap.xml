@@ -1,2 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://aetheratelierco.com/</loc></url></urlset>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url><loc>https://aetheratelierco.com/</loc></url>
+<url><loc>https://aetheratelierco.com/collection.html</loc></url>
+<url><loc>https://aetheratelierco.com/experiences.html</loc></url>
+<url><loc>https://aetheratelierco.com/imprint.html</loc></url>
+<url><loc>https://aetheratelierco.com/consulting.html</loc></url>
+<url><loc>https://aetheratelierco.com/framing.html</loc></url>
+<url><loc>https://aetheratelierco.com/commissions.html</loc></url>
+<url><loc>https://aetheratelierco.com/shipping.html</loc></url>
+<url><loc>https://aetheratelierco.com/payment.html</loc></url>
+</urlset>

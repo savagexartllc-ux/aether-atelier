@@ -2,9 +2,14 @@
   // Must match the Worker's name in Cloudflare (Workers & Pages).
   "name": "broken-mud-4e8f",
   "compatibility_date": "2025-03-07",
-  // Serves everything in /public as the website. No server code needed.
+  // Small script for /api/* (Stripe → Printful orders). Everything else is served from /public.
+  "main": "src/index.js",
   "assets": {
-    "directory": "./public"
+    "directory": "./public",
+    "binding": "ASSETS"
   },
+  "vars": { "PRINTFUL_STORE_ID": "19006706" },
+  // Secrets STRIPE_WEBHOOK_SECRET and PRINTFUL_TOKEN are set in the Cloudflare dashboard, never in this repo.
+  "keep_vars": true,
   "observability": { "enabled": true }
 }

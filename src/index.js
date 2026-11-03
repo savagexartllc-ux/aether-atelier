@@ -28,7 +28,15 @@ export default {
       return handleStripe(request, env);
     }
     if (url.pathname === "/api/health") {
-      return json({ ok: true, stripe: !!env.STRIPE_WEBHOOK_SECRET, printful: !!env.PRINTFUL_TOKEN });
+      const out = { ok: true, stripe: !!env.STRIPE_WEBHOOK_SECRET, printful: !!env.PRINTFUL_TOKEN,
+        stripe_format_ok: String(env.STRIPE_WEBHOOK_SECRET || "").startsWith("whsec_") };
+      if (url.searchParams.has("deep") && env.PRINTFUL_TOKEN) {
+        const r = await pf(env, "/store/products/" + SKU_TO_PRINTFUL["emb-tee-black"]);
+        const d = await r.json().catch(() => ({}));
+        out.printful_api = r.status;
+        out.printful_variants = d.result ? (d.result.sync_variants || []).map((v) => v.size) : (d.error && d.error.message);
+      }
+      return json(out);
     }
     return env.ASSETS.fetch(request);
   },

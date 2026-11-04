@@ -23,6 +23,8 @@ const SKU_TO_PRINTFUL = {
   "emb-cap-white": 488927569,
   "sticker": 489158135,
   "mug-black": 489180254,
+  "sweatshirt-white": 489229910,
+  "vneck-white": 489233807,
 };
 
 export default {

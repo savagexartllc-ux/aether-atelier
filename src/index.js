@@ -21,6 +21,7 @@ const SKU_TO_PRINTFUL = {
   "emb-vneck-white": 488926835,
   "emb-cap-black": 488927327,
   "emb-cap-white": 488927569,
+  "sticker": 489158135,
 };
 
 export default {

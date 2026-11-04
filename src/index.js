@@ -45,6 +45,21 @@ export default {
       }
       return json(out);
     }
+    if (url.pathname === "/api/mockups") {
+      // Public product mockup image URLs (no secrets), used to pick site photos.
+      const out = {};
+      for (const [sku, id] of Object.entries(SKU_TO_PRINTFUL)) {
+        const r = await pf(env, "/store/products/" + id);
+        const d = await r.json().catch(() => ({}));
+        const v = (d.result && d.result.sync_variants) || [];
+        out[sku] = {
+          thumb: d.result && d.result.sync_product && d.result.sync_product.thumbnail_url,
+          previews: [...new Set(v.flatMap((x) => (x.files || []).filter((f) => f.type === "preview").map((f) => f.preview_url)))].slice(0, 3),
+          color: v[0] && v[0].color,
+        };
+      }
+      return json(out);
+    }
     return env.ASSETS.fetch(request);
   },
 };

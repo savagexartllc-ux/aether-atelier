@@ -18,6 +18,9 @@ const SKU_TO_PRINTFUL = {
   "print-tee-black": 488796343,
   "print-hoodie-black": 488799954,
   "tote": 488799588,
+  "emb-vneck-white": 488926835,
+  "emb-cap-black": 488927327,
+  "emb-cap-white": 488927569,
 };
 
 export default {

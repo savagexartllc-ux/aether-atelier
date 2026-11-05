@@ -45,6 +45,15 @@ export default {
       }
       return json(out);
     }
+    if (url.pathname === "/api/pf-tmp") {
+      // TEMPORARY read helper for building product galleries; removed after use.
+      const path = url.searchParams.get("p") || "";
+      const ok = /^\/store\/products\/\d+$/.test(path) || /^\/mockup-generator\/(printfiles|templates)\/\d+$/.test(path) || /^\/mockup-generator\/task\?task_key=[\w-]+$/.test(path);
+      const gen = /^\/mockup-generator\/create-task\/\d+$/.test(path) && request.method === "POST";
+      if (!ok && !gen) return json({ error: "not allowed" }, 400);
+      const r = await pf(env, path, gen ? { method: "POST", body: await request.text() } : {});
+      return new Response(await r.text(), { status: r.status, headers: { "Content-Type": "application/json" } });
+    }
     if (url.pathname === "/api/mockups") {
       // Public product mockup image URLs (no secrets), used to pick site photos.
       const out = {};

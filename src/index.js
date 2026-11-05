@@ -51,41 +51,6 @@ export default {
       if (!obj || !obj.value) return new Response("Not found", { status: 404 });
       return new Response(obj.value, { headers: { "Content-Type": (obj.metadata && obj.metadata.type) || "image/jpeg", "Cache-Control": "public, max-age=31536000, immutable" } });
     }
-    if (url.pathname === "/api/pf-tmp-save" && request.method === "POST") {
-      // TEMPORARY: copy a Printful mockup into permanent storage; removed after use.
-      const { src, name } = await request.json();
-      if (!/^https:\/\/(printful-upload\.s3-accelerate\.amazonaws\.com|files\.cdn\.printful\.com)\//.test(src || "") || !/^[a-z0-9-]+\.jpg$/.test(name || ""))
-        return json({ error: "not allowed" }, 400);
-      const r = await fetch(src);
-      if (!r.ok) return json({ error: "fetch " + r.status }, 502);
-      const buf = await r.arrayBuffer();
-      await env.MERCH_PHOTOS.put(name, buf, { metadata: { type: r.headers.get("content-type") || "image/jpeg" } });
-      return json({ ok: true, name, bytes: buf.byteLength });
-    }
-    if (url.pathname === "/api/pf-tmp") {
-      // TEMPORARY read helper for building product galleries; removed after use.
-      const path = url.searchParams.get("p") || "";
-      const ok = /^\/store\/products\/\d+$/.test(path) || /^\/mockup-generator\/(printfiles|templates)\/\d+(\?technique=[A-Z]+)?$/.test(path) || /^\/mockup-generator\/task\?task_key=[\w-]+$/.test(path);
-      const gen = /^\/mockup-generator\/create-task\/\d+$/.test(path) && request.method === "POST";
-      if (!ok && !gen) return json({ error: "not allowed" }, 400);
-      const r = await pf(env, path, gen ? { method: "POST", body: await request.text() } : {});
-      return new Response(await r.text(), { status: r.status, headers: { "Content-Type": "application/json" } });
-    }
-    if (url.pathname === "/api/mockups") {
-      // Public product mockup image URLs (no secrets), used to pick site photos.
-      const out = {};
-      for (const [sku, id] of Object.entries(SKU_TO_PRINTFUL)) {
-        const r = await pf(env, "/store/products/" + id);
-        const d = await r.json().catch(() => ({}));
-        const v = (d.result && d.result.sync_variants) || [];
-        out[sku] = {
-          thumb: d.result && d.result.sync_product && d.result.sync_product.thumbnail_url,
-          previews: [...new Set(v.flatMap((x) => (x.files || []).filter((f) => f.type === "preview").map((f) => f.preview_url)))].slice(0, 3),
-          color: v[0] && v[0].color,
-        };
-      }
-      return json(out);
-    }
     return env.ASSETS.fetch(request);
   },
 };

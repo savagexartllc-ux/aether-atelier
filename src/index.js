@@ -65,7 +65,7 @@ export default {
     if (url.pathname === "/api/pf-tmp") {
       // TEMPORARY read helper for building product galleries; removed after use.
       const path = url.searchParams.get("p") || "";
-      const ok = /^\/store\/products\/\d+$/.test(path) || /^\/mockup-generator\/(printfiles|templates)\/\d+$/.test(path) || /^\/mockup-generator\/task\?task_key=[\w-]+$/.test(path);
+      const ok = /^\/store\/products\/\d+$/.test(path) || /^\/mockup-generator\/(printfiles|templates)\/\d+(\?technique=[A-Z]+)?$/.test(path) || /^\/mockup-generator\/task\?task_key=[\w-]+$/.test(path);
       const gen = /^\/mockup-generator\/create-task\/\d+$/.test(path) && request.method === "POST";
       if (!ok && !gen) return json({ error: "not allowed" }, 400);
       const r = await pf(env, path, gen ? { method: "POST", body: await request.text() } : {});

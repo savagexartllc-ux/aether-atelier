@@ -45,6 +45,23 @@ export default {
       }
       return json(out);
     }
+    if (url.pathname.startsWith("/m/")) {
+      const key = url.pathname.slice(3);
+      const obj = env.MERCH_PHOTOS && (await env.MERCH_PHOTOS.getWithMetadata(key, "arrayBuffer"));
+      if (!obj || !obj.value) return new Response("Not found", { status: 404 });
+      return new Response(obj.value, { headers: { "Content-Type": (obj.metadata && obj.metadata.type) || "image/jpeg", "Cache-Control": "public, max-age=31536000, immutable" } });
+    }
+    if (url.pathname === "/api/pf-tmp-save" && request.method === "POST") {
+      // TEMPORARY: copy a Printful mockup into permanent storage; removed after use.
+      const { src, name } = await request.json();
+      if (!/^https:\/\/(printful-upload\.s3-accelerate\.amazonaws\.com|files\.cdn\.printful\.com)\//.test(src || "") || !/^[a-z0-9-]+\.jpg$/.test(name || ""))
+        return json({ error: "not allowed" }, 400);
+      const r = await fetch(src);
+      if (!r.ok) return json({ error: "fetch " + r.status }, 502);
+      const buf = await r.arrayBuffer();
+      await env.MERCH_PHOTOS.put(name, buf, { metadata: { type: r.headers.get("content-type") || "image/jpeg" } });
+      return json({ ok: true, name, bytes: buf.byteLength });
+    }
     if (url.pathname === "/api/pf-tmp") {
       // TEMPORARY read helper for building product galleries; removed after use.
       const path = url.searchParams.get("p") || "";

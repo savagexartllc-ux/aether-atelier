@@ -4,7 +4,7 @@
   var css =
     ".mi{position:relative;cursor:zoom-in}" +
     ".mi .gv{position:absolute;right:8px;bottom:8px;background:rgba(10,10,10,.78);color:#fff;font:600 .72rem/1 system-ui,sans-serif;letter-spacing:.04em;padding:7px 10px;border:0;cursor:pointer}" +
-    ".mgx{position:fixed;inset:0;z-index:9999;background:rgba(10,10,10,.92);display:none;flex-direction:column;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}" +
+    ".mgx{position:fixed;inset:0;z-index:9999;background:rgba(10,10,10,.97);display:none;flex-direction:column;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}" +
     ".mgx.on{display:flex}" +
     ".mgx .mgw{position:relative;width:min(92vw,640px);max-height:72vh;display:flex;align-items:center;justify-content:center;background:#fff}" +
     ".mgx .mgw img{display:block;max-width:100%;max-height:72vh;object-fit:contain}" +

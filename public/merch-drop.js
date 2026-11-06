@@ -6,7 +6,7 @@
     if (Date.now() - last < DAYS * 864e5) return;
   } catch (e) {}
   var css =
-    ".mdx{position:fixed;inset:0;z-index:9998;background:rgba(10,10,10,.72);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;opacity:0;transition:opacity .35s}" +
+    ".mdx{position:fixed;inset:0;z-index:2147483000;background:rgba(10,10,10,.72);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;opacity:0;transition:opacity .35s}" +
     ".mdx.on{opacity:1}" +
     ".mdx .mdc{position:relative;width:min(100%,420px);background:#0a0a0a;color:#fff;border:1px solid #a8884a;box-shadow:0 20px 60px rgba(0,0,0,.5);overflow:hidden;font-family:Georgia,serif}" +
     ".mdx .mdi{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;object-position:center 25%}" +

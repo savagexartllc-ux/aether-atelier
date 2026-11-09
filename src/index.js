@@ -45,6 +45,11 @@ export default {
       }
       return json(out);
     }
+    if (url.pathname === "/api/hit" && request.method === "POST") {
+      // Visit counter: one row per page view or Buy click. No IPs, cookies or personal data.
+      try { await recordHit(request, env); } catch (e) { console.log("hit error", String(e)); }
+      return new Response(null, { status: 204 });
+    }
     if (url.pathname.startsWith("/m/")) {
       const key = url.pathname.slice(3);
       const obj = env.MERCH_PHOTOS && (await env.MERCH_PHOTOS.getWithMetadata(key, "arrayBuffer"));
@@ -149,4 +154,36 @@ async function verifyStripe(payload, header, secret) {
 
 function json(o, status = 200) {
   return new Response(JSON.stringify(o), { status, headers: { "Content-Type": "application/json" } });
+}
+
+const BOT = /bot|crawl|spider|slurp|preview|facebookexternalhit|headless|lighthouse|pingdom|monitor/i;
+const SOURCES = [
+  ["instagram", /instagram\./], ["facebook", /(^|\.)(facebook|fb)\.(com|me)|messenger\./], ["tiktok", /tiktok\./],
+  ["pinterest", /pinterest\.|pin\.it/], ["google", /google\./], ["bing", /bing\./], ["youtube", /youtube\.|youtu\.be/],
+  ["threads", /threads\.net/], ["etsy", /etsy\./], ["stripe", /stripe\.com/],
+];
+async function recordHit(request, env) {
+  if (!env.STATS) return;
+  const ua = request.headers.get("user-agent") || "";
+  if (!ua || BOT.test(ua)) return;
+  const b = await request.json().catch(() => ({}));
+  const kind = b.k === "buy" ? "buy" : "view";
+  let path = String(b.p || "/").slice(0, 120);
+  if (!path.startsWith("/")) path = "/";
+  path = path.replace(/\.html$/, "").replace(/\/index$/, "/") || "/";
+  let source = String(b.u || "").toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 30);
+  if (!source) {
+    let host = "";
+    try { host = new URL(String(b.r || "")).hostname.toLowerCase(); } catch (e) {}
+    if (!host) source = "direct";
+    else if (/aetheratelierco\.com$/.test(host)) source = "internal";
+    else source = (SOURCES.find(([, re]) => re.test(host)) || [host.replace(/^www\./, "").slice(0, 40)])[0];
+  }
+  const device = /Mobi|Android|iPhone|iPad/i.test(ua) ? "mobile" : "desktop";
+  const country = (request.cf && request.cf.country) || "";
+  const now = new Date();
+  const day = now.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  const item = kind === "buy" ? String(b.i || "").slice(0, 80) : null;
+  await env.STATS.prepare("INSERT INTO hits (ts, day, kind, path, source, device, country, new_session, item) VALUES (?,?,?,?,?,?,?,?,?)")
+    .bind(now.toISOString(), day, kind, path, source, device, country, b.s ? 1 : 0, item).run();
 }

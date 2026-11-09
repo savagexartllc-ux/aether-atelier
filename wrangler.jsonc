@@ -11,6 +11,8 @@
   "vars": { "PRINTFUL_STORE_ID": "19006706" },
   // Product gallery photos (Printful mockups saved permanently), served at /m/<name>.jpg
   "kv_namespaces": [{ "binding": "MERCH_PHOTOS", "id": "a7e5ff3a43e84c8186141ddce3287c66" }],
+  // Visit counter (page views, merch Buy clicks; no personal data)
+  "d1_databases": [{ "binding": "STATS", "database_name": "gilt-analytics", "database_id": "f204b738-ddef-415d-906f-e46bed425042" }],
   // Secrets STRIPE_WEBHOOK_SECRET and PRINTFUL_TOKEN are set in the Cloudflare dashboard, never in this repo.
   "keep_vars": true,
   "observability": { "enabled": true }

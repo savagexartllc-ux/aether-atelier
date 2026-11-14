@@ -30,7 +30,8 @@ const SKU_TO_PRINTFUL = {
 export default {
   // TEMPORARY: one-off creation of new art merch in Printful, one item per run, progress in D1 "jobs". Removed after use.
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(runArtJob(env).catch((e) => console.log("art job error", String(e))));
+    const log = (st, n) => env.STATS.prepare("INSERT INTO jobs (item, status, note, updated) VALUES (?,?,?,?) ON CONFLICT(item) DO UPDATE SET status=excluded.status, note=excluded.note, updated=excluded.updated").bind("_run", st, n, new Date().toISOString()).run();
+    ctx.waitUntil(log("start", "").then(() => runArtJob(env)).then(() => log("ok", "")).catch((e) => log("error", String(e && e.stack || e).slice(0, 500))));
   },
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -245,7 +246,7 @@ async function runArtJob(env) {
     const b = await (await fetch(shots[i].u)).arrayBuffer();
     const n = it.key + "-" + (i + 1) + ".jpg";
     await env.MERCH_PHOTOS.put(n, b, { metadata: { type: "image/jpeg" } });
-    saved.push(n + "|" + shots[i].t);
+    saved.push(n + "|" + shots[i].t + "|" + shots[i].u);
   }
   await note("done", { id: prod.id, photos: saved.join(",") });
 }

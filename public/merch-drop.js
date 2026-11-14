@@ -1,6 +1,6 @@
 // Home page: "New merch is dropping" announcement. Shows once every few days per visitor.
 (function () {
-  var KEY = "gs-merch-drop-v1", DAYS = 3;
+  var KEY = "gs-merch-drop-v2", DAYS = 3;
   try {
     var last = +localStorage.getItem(KEY) || 0;
     if (Date.now() - last < DAYS * 864e5) return;
@@ -30,10 +30,10 @@
     d.setAttribute("aria-label", "New merch announcement");
     d.innerHTML =
       '<div class="mdc"><button class="mdx-x" aria-label="Close">&times;</button>' +
-      '<img class="mdi" src="img/persephone-art.jpg" alt="Persephone, original painting by Lauren">' +
-      '<div class="mdb"><p class="mdk">Society Merch</p><h2>New merch is dropping</h2>' +
+      '<img class="mdi" src="img/the-loop-theory-art.jpg" alt="The Loop Theory, original painting by Lauren">' +
+      '<div class="mdb"><p class="mdk">Society Merch</p><h2>New editions just dropped</h2>' +
       '<p class="mde">&#9651; &#9651; &#9661; &#9661;</p>' +
-      '<p class="mdt">The Persephone Edition and Gilt Society. pieces: embroidered caps, tees, hoodies, mugs and more. Made to order.</p>' +
+      '<p class="mdt">The Loop Theory and Iris Editions are here: art-backed hoodies and tees, black mugs and stickers. Made to order.</p>' +
       '<a class="mdg" href="merch.html">Shop Society Merch &rarr;</a>' +
       '<button class="mdn" type="button">Maybe later</button></div></div>';
     document.body.appendChild(d);

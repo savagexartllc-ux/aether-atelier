@@ -25,14 +25,15 @@ const SKU_TO_PRINTFUL = {
   "mug-black": 489180254,
   "sweatshirt-white": 489229910,
   "vneck-white": 489233807,
+  "iris-mug": 493865399,
+  "iris-sticker": 493868893,
+  "loop-mug": 493872128,
+  "loop-sticker": 493874379,
+  "loop-hoodie": 493876096,
+  "loop-tee": 493877391,
 };
 
 export default {
-  // TEMPORARY: one-off creation of new art merch in Printful, one item per run, progress in D1 "jobs". Removed after use.
-  async scheduled(event, env, ctx) {
-    const log = (st, n) => env.STATS.prepare("INSERT INTO jobs (item, status, note, updated) VALUES (?,?,?,?) ON CONFLICT(item) DO UPDATE SET status=excluded.status, note=excluded.note, updated=excluded.updated").bind("_run", st, n, new Date().toISOString()).run();
-    ctx.waitUntil(log("start", "").then(() => runArtJob(env)).then(() => log("ok", "")).catch((e) => log("error", String(e && e.stack || e).slice(0, 500))));
-  },
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/api/stripe-webhook") {
@@ -193,60 +194,3 @@ async function recordHit(request, env) {
     .bind(now.toISOString(), day, kind, path, source, device, country, b.s ? 1 : 0, item).run();
 }
 
-const RAW_B = "https://raw.githubusercontent.com/savagexartllc-ux/aether-atelier/main/print-files/b/";
-const ART_ITEMS = [
-  { key: "iris-mug", name: "Iris Mug - Black", from: 489180254, files: { "*": "gs-iris-black-mug-11oz.png" } },
-  { key: "iris-sticker", name: "Iris Sticker", from: 489158135, files: { "*": "gs-iris-sticker.png" } },
-  { key: "loop-mug", name: "The Loop Theory Mug - Black", from: 489180254, files: { "*": "gs-the-loop-theory-black-mug-11oz.png" } },
-  { key: "loop-sticker", name: "The Loop Theory Sticker", from: 489158135, files: { "*": "gs-the-loop-theory-sticker.png" } },
-  { key: "loop-hoodie", name: "The Loop Theory Hoodie - Black", from: 488799954, files: { back: "gs-the-loop-theory-back.png", "*": "gs2-chest-dark-full.png" } },
-  { key: "loop-tee", name: "The Loop Theory Tee - Black", from: 488796343, files: { back: "gs-the-loop-theory-back.png", "*": "gs2-chest-dark-full.png" } },
-];
-async function runArtJob(env) {
-  const done = new Set(((await env.STATS.prepare("SELECT item FROM jobs WHERE status = 'done'").all()).results || []).map((r) => r.item));
-  const it = ART_ITEMS.find((x) => !done.has(x.key));
-  if (!it) return;
-  const note = async (status, extra = {}) =>
-    env.STATS.prepare("INSERT INTO jobs (item, status, product_id, photos, note, updated) VALUES (?,?,?,?,?,?) ON CONFLICT(item) DO UPDATE SET status=excluded.status, product_id=COALESCE(excluded.product_id, jobs.product_id), photos=COALESCE(excluded.photos, jobs.photos), note=excluded.note, updated=excluded.updated")
-      .bind(it.key, status, extra.id ? String(extra.id) : null, extra.photos || null, extra.note || null, new Date().toISOString()).run();
-  const fileFor = (type) => RAW_B + (it.files[type] || it.files["*"]);
-  const src = (await (await pf(env, "/store/products/" + it.from)).json()).result;
-  const list = (await (await pf(env, "/store/products?limit=100")).json()).result || [];
-  let prod = list.find((p) => p.name === it.name);
-  if (!prod) {
-    const body = { sync_product: { name: it.name }, sync_variants: src.sync_variants.map((v) => ({ variant_id: v.variant_id, retail_price: v.retail_price,
-      files: v.files.filter((f) => f.type !== "preview").map((f) => ({ type: f.type, url: fileFor(f.type) })) })) };
-    const cr = await (await pf(env, "/store/products", { method: "POST", body: JSON.stringify(body) })).json();
-    if (!cr.result) { await note("error", { note: JSON.stringify(cr).slice(0, 400) }); return; }
-    prod = cr.result;
-    await note("created", { id: prod.id });
-    return; // mockups on the next run
-  }
-  const v0 = src.sync_variants[0];
-  const pid = v0.product.product_id, vid = v0.product.variant_id;
-  const pfs = (await (await pf(env, "/mockup-generator/printfiles/" + pid)).json()).result;
-  const vp = pfs.variant_printfiles.find((x) => x.variant_id == vid).placements;
-  const files = v0.files.filter((f) => f.type !== "preview").map((f) => {
-    const pl = f.type === "default" ? (vp.front ? "front" : Object.keys(vp)[0]) : f.type;
-    const pr = pfs.printfiles.find((p) => p.printfile_id == vp[pl]);
-    return { placement: pl, image_url: fileFor(f.type), position: { area_width: pr.width, area_height: pr.height, width: pr.width, height: pr.height, top: 0, left: 0 } };
-  });
-  const t = await (await pf(env, "/mockup-generator/create-task/" + pid, { method: "POST", body: JSON.stringify({ variant_ids: [vid], format: "jpg", files }) })).json();
-  if (!t.result) { await note("error", { id: prod.id, note: "mockup " + JSON.stringify(t).slice(0, 300) }); return; }
-  let res;
-  for (let i = 0; i < 12; i++) {
-    await new Promise((r) => setTimeout(r, 5000));
-    res = (await (await pf(env, "/mockup-generator/task?task_key=" + t.result.task_key)).json()).result;
-    if (res && res.status !== "pending") break;
-  }
-  const shots = res && res.mockups ? res.mockups.flatMap((m) => [{ u: m.mockup_url, t: m.placement }, ...(m.extra || []).map((e) => ({ u: e.url, t: e.title || e.option }))]) : [];
-  if (!shots.length) { await note("error", { id: prod.id, note: "no mockups " + JSON.stringify(res || {}).slice(0, 300) }); return; }
-  const saved = [];
-  for (let i = 0; i < shots.length && i < 6; i++) {
-    const b = await (await fetch(shots[i].u)).arrayBuffer();
-    const n = it.key + "-" + (i + 1) + ".jpg";
-    await env.MERCH_PHOTOS.put(n, b, { metadata: { type: "image/jpeg" } });
-    saved.push(n + "|" + shots[i].t + "|" + shots[i].u);
-  }
-  await note("done", { id: prod.id, photos: saved.join(",") });
-}

@@ -1,0 +1,32 @@
+name: Create new art merch
+on:
+  push:
+    paths: [".github/new-art-run.txt"]
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for site deploy
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "https://aetheratelierco.com/api/tmp-new-art?item=x")
+            [ "$code" = "400" ] && break; sleep 10; done
+      - name: Create products and mockups
+        run: |
+          mkdir -p print-files/photos
+          : > print-files/new-art-result.jsonl
+          for it in iris-mug iris-sticker loop-mug loop-sticker; do
+            curl -sS --max-time 120 "https://aetheratelierco.com/api/tmp-new-art?item=$it&mockups=1" >> print-files/new-art-result.jsonl; echo >> print-files/new-art-result.jsonl
+            sleep 5
+          done
+          cat print-files/new-art-result.jsonl
+          for n in $(grep -o '"[a-z-]*-[0-9]\.jpg"' print-files/new-art-result.jsonl | tr -d '"'); do
+            curl -fsSL "https://aetheratelierco.com/m/$n" -o "print-files/photos/$n" || true
+          done
+      - name: Commit
+        run: |
+          git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"
+          git add print-files; git diff --cached --quiet || git commit -m "New art merch: Printful results and photos"; git pull --rebase; git push

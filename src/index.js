@@ -56,6 +56,53 @@ export default {
       if (!obj || !obj.value) return new Response("Not found", { status: 404 });
       return new Response(obj.value, { headers: { "Content-Type": (obj.metadata && obj.metadata.type) || "image/jpeg", "Cache-Control": "public, max-age=31536000, immutable" } });
     }
+    if (url.pathname === "/api/tmp-new-art") {
+      // TEMPORARY one-off for the Iris / Loop Theory merch; idempotent (skips if the product exists). Removed after use.
+      const ITEMS = {
+        "iris-mug": { name: "Iris Mug - Black", from: 489180254, file: "gs-iris-black-mug-11oz.png" },
+        "iris-sticker": { name: "Iris Sticker", from: 489158135, file: "gs-iris-sticker.png" },
+        "loop-mug": { name: "The Loop Theory Mug - Black", from: 489180254, file: "gs-the-loop-theory-black-mug-11oz.png" },
+        "loop-sticker": { name: "The Loop Theory Sticker", from: 489158135, file: "gs-the-loop-theory-sticker.png" },
+      };
+      const key = url.searchParams.get("item"), it = ITEMS[key];
+      if (!it) return json({ error: "unknown item" }, 400);
+      const fileUrl = "https://raw.githubusercontent.com/savagexartllc-ux/aether-atelier/main/print-files/b/" + it.file;
+      const list = (await (await pf(env, "/store/products?limit=100")).json()).result || [];
+      let prod = list.find((p) => p.name === it.name);
+      const out = { item: key };
+      const src = (await (await pf(env, "/store/products/" + it.from)).json()).result;
+      if (!prod) {
+        const body = { sync_product: { name: it.name }, sync_variants: src.sync_variants.map((v) => ({ variant_id: v.variant_id, retail_price: v.retail_price, files: [{ type: (v.files.find((f) => f.type !== "preview") || {}).type || "default", url: fileUrl }] })) };
+        const cr = await (await pf(env, "/store/products", { method: "POST", body: JSON.stringify(body) })).json();
+        out.created = cr.result ? cr.result.id : cr;
+        prod = cr.result;
+      } else out.existing = prod.id;
+      out.id = prod && prod.id;
+      if (url.searchParams.has("mockups") && out.id) {
+        const v0 = src.sync_variants[0].product;
+        const pfs = (await (await pf(env, "/mockup-generator/printfiles/" + v0.product_id)).json()).result;
+        const vp = pfs.variant_printfiles.find((x) => x.variant_id == v0.variant_id).placements;
+        const pl = Object.keys(vp)[0];
+        const pr = pfs.printfiles.find((p) => p.printfile_id == vp[pl]);
+        const t = await (await pf(env, "/mockup-generator/create-task/" + v0.product_id, { method: "POST", body: JSON.stringify({ variant_ids: [v0.variant_id], format: "jpg", files: [{ placement: pl, image_url: fileUrl, position: { area_width: pr.width, area_height: pr.height, width: pr.width, height: pr.height, top: 0, left: 0 } }] }) })).json();
+        let res;
+        for (let i = 0; i < 10; i++) {
+          await new Promise((r) => setTimeout(r, 4000));
+          res = (await (await pf(env, "/mockup-generator/task?task_key=" + t.result.task_key)).json()).result;
+          if (res && res.status !== "pending") break;
+        }
+        const urls = res && res.mockups ? res.mockups.flatMap((m) => [m.mockup_url, ...(m.extra || []).map((e) => e.url)]) : [];
+        out.saved = [];
+        for (let i = 0; i < urls.length && i < 4; i++) {
+          const b = await (await fetch(urls[i])).arrayBuffer();
+          const n = key + "-" + (i + 1) + ".jpg";
+          await env.MERCH_PHOTOS.put(n, b, { metadata: { type: "image/jpeg" } });
+          out.saved.push(n);
+        }
+        if (!urls.length) out.task = res || t;
+      }
+      return json(out);
+    }
     return env.ASSETS.fetch(request);
   },
 };

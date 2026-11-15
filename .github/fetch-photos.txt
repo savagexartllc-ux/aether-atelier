@@ -1,6 +1,6 @@
-loop-tee-1.jpg
-loop-tee-2.jpg
-loop-tee-3.jpg
-loop-tee-4.jpg
-loop-tee-5.jpg
-loop-tee-6.jpg
+iris-hoodie-1.jpg
+iris-hoodie-2.jpg
+iris-hoodie-3.jpg
+iris-hoodie-4.jpg
+iris-hoodie-5.jpg
+iris-hoodie-6.jpg

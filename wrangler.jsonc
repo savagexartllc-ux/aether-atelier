@@ -15,6 +15,6 @@
   "d1_databases": [{ "binding": "STATS", "database_name": "gilt-analytics", "database_id": "f204b738-ddef-415d-906f-e46bed425042" }],
   // Secrets STRIPE_WEBHOOK_SECRET and PRINTFUL_TOKEN are set in the Cloudflare dashboard, never in this repo.
   "keep_vars": true,
-  "triggers": { "crons": ["*/2 * * * *"] },
+  "triggers": { "crons": [] },
   "observability": { "enabled": true }
 }

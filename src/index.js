@@ -68,6 +68,19 @@ export default {
       try { await recordHit(request, env); } catch (e) { console.log("hit error", String(e)); }
       return new Response(null, { status: 204 });
     }
+    if (url.pathname === "/api/subscribe" && request.method === "POST") {
+      // Email sign-up from the site pop-up. Stores only what the visitor typed, with the consent wording they agreed to.
+      let b = {};
+      try { b = await request.json(); } catch (_) {}
+      const email = String(b.email || "").trim().toLowerCase().slice(0, 200);
+      const name = String(b.name || "").trim().slice(0, 60);
+      if (b.website) return Response.json({ ok: true }); // honeypot: bots fill hidden fields
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return Response.json({ ok: false, error: "email" }, { status: 400 });
+      const consent = "Yes, email me Gilt Society. drops and offers. Unsubscribe anytime.";
+      await env.STATS.prepare("INSERT INTO subscribers (email, first_name, source, page, consent, created) VALUES (?,?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET first_name=COALESCE(NULLIF(excluded.first_name,''), subscribers.first_name)")
+        .bind(email, name, String(b.source || "popup").slice(0, 40), String(b.page || "").slice(0, 120), consent, new Date().toISOString()).run();
+      return Response.json({ ok: true });
+    }
     if (url.pathname.startsWith("/m/")) {
       const key = url.pathname.slice(3);
       const obj = env.MERCH_PHOTOS && (await env.MERCH_PHOTOS.getWithMetadata(key, "arrayBuffer"));

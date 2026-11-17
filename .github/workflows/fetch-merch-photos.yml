@@ -14,7 +14,7 @@ jobs:
           mkdir -p print-files/photos
           while read -r name; do
             [ -z "$name" ] && continue
-            curl -fsSL "https://aetheratelierco.com/m/$name?v=4" -o "print-files/photos/$name" || echo "missing $name"
+            curl -fsSL "https://aetheratelierco.com/m/$name?v=5" -o "print-files/photos/$name" || echo "missing $name"
           done < .github/fetch-photos.txt
       - name: Commit
         run: |

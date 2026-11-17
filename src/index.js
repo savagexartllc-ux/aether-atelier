@@ -268,11 +268,11 @@ const HOME_ITEMS = [
   { key: "helios-rug", name: "Helios Rising Area Rug 3x5", product: 924, variant: 23703, price: "149.00", files: { default: "helios-rising-rug-36x60.jpg" } },
   { key: "iris-rug", name: "Iris Area Rug 5x3", product: 924, variant: 23706, price: "149.00", files: { default: "iris-rug-60x36-v2.jpg" } },
   { key: "gilded-rug", name: "Gilded Rain Area Rug 3x5", product: 924, variant: 23703, price: "149.00", files: { default: "gilded-rain-rug-36x60.jpg" } },
-  { key: "iris-blanket", name: "Iris Throw Blanket 50x60", product: 395, variant: 10986, price: "79.00", files: { default: "iris-blanket-50x60-v2.jpg" } },
-  { key: "loop-blanket", name: "The Loop Theory Throw Blanket 50x60", product: 395, variant: 10986, price: "79.00", files: { default: "loop-blanket-50x60.jpg" } },
-  { key: "gilded-blanket", name: "Gilded Rain Throw Blanket 50x60", product: 395, variant: 10986, price: "79.00", files: { default: "gilded-rain-blanket-50x60.jpg" } },
-  { key: "iris-backpack", name: "Iris Backpack", product: 279, variant: 9063, price: "89.00", files: { default: "iris-backpack-front.jpg", top: "iris-backpack-top.jpg", bottom: "iris-backpack-bottom.jpg", pocket: "iris-backpack-pocket.jpg" } },
-  { key: "loop-backpack", name: "The Loop Theory Backpack", product: 279, variant: 9063, price: "89.00", files: { default: "loop-backpack-front.jpg", top: "loop-backpack-top.jpg", bottom: "loop-backpack-bottom.jpg", pocket: "loop-backpack-pocket.jpg" } },
+  { key: "iris-blanket", groups: ["Default", "Lifestyle", "Lifestyle 2", "Lifestyle 3", "Lifestyle 4", "Lifestyle 5", "Lifestyle 6"], name: "Iris Throw Blanket 50x60", product: 395, variant: 10986, price: "79.00", files: { default: "iris-blanket-50x60-v2.jpg" } },
+  { key: "loop-blanket", groups: ["Default", "Lifestyle", "Lifestyle 2", "Lifestyle 3", "Lifestyle 4", "Lifestyle 5", "Lifestyle 6"], name: "The Loop Theory Throw Blanket 50x60", product: 395, variant: 10986, price: "79.00", files: { default: "loop-blanket-50x60.jpg" } },
+  { key: "gilded-blanket", groups: ["Default", "Lifestyle", "Lifestyle 2", "Lifestyle 3", "Lifestyle 4", "Lifestyle 5", "Lifestyle 6"], name: "Gilded Rain Throw Blanket 50x60", product: 395, variant: 10986, price: "79.00", files: { default: "gilded-rain-blanket-50x60.jpg" } },
+  { key: "iris-backpack", groups: ["Default", "Lifestyle", "Women's Lifestyle", "Men's Lifestyle", "Flat Lifestyle"], name: "Iris Backpack", product: 279, variant: 9063, price: "89.00", files: { default: "iris-backpack-front.jpg", top: "iris-backpack-top.jpg", bottom: "iris-backpack-bottom.jpg", pocket: "iris-backpack-pocket.jpg" } },
+  { key: "loop-backpack", groups: ["Default", "Lifestyle", "Women's Lifestyle", "Men's Lifestyle", "Flat Lifestyle"], name: "The Loop Theory Backpack", product: 279, variant: 9063, price: "89.00", files: { default: "loop-backpack-front.jpg", top: "loop-backpack-top.jpg", bottom: "loop-backpack-bottom.jpg", pocket: "loop-backpack-pocket.jpg" } },
   { key: "iris-curtain", name: "Iris Blackout Curtain Panel", product: 1737, variant: 54570, price: "99.00", files: { default: "iris-curtain-50x84.jpg" } },
   { key: "loop-curtain", name: "The Loop Theory Blackout Curtain Panel", product: 1737, variant: 54570, price: "99.00", files: { default: "loop-curtain-50x84.jpg" } },
   { key: "gilded-curtain", name: "Gilded Rain Blackout Curtain Panel", product: 1737, variant: 54570, price: "99.00", files: { default: "gilded-rain-curtain-50x84.jpg" } },
@@ -304,7 +304,7 @@ async function runHomeJob(env) {
     const pr = pfs.printfiles.find((p) => p.printfile_id == vp[pl]);
     return { placement: pl, image_url: RAW_H + f, position: { area_width: pr.width, area_height: pr.height, width: pr.width, height: pr.height, top: 0, left: 0 } };
   });
-  const t = await (await pf(env, "/mockup-generator/create-task/" + it.product, { method: "POST", body: JSON.stringify({ variant_ids: [it.variant], format: "jpg", files }) })).json();
+  const t = await (await pf(env, "/mockup-generator/create-task/" + it.product, { method: "POST", body: JSON.stringify(Object.assign({ variant_ids: [it.variant], format: "jpg", files }, it.groups ? { option_groups: it.groups } : {})) })).json();
   if (!t.result) { await note("error", { note: "mockup " + JSON.stringify(t).slice(0, 300) }); return; }
   let res;
   for (let i = 0; i < 14; i++) {

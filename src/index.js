@@ -37,7 +37,7 @@ const SKU_TO_PRINTFUL = {
 export default {
   async scheduled(event, env, ctx) {
     const log = (st, n) => env.STATS.prepare("INSERT INTO jobs (item, status, note, updated) VALUES (?,?,?,?) ON CONFLICT(item) DO UPDATE SET status=excluded.status, note=excluded.note, updated=excluded.updated").bind("_run", st, n, new Date().toISOString()).run();
-    ctx.waitUntil(log("start", "").then(() => runArtJob(env)).then(() => log("ok", "")).catch((e) => log("error", String((e && e.stack) || e).slice(0, 500))));
+    ctx.waitUntil(log("start", "").then(() => runArtJob(env)).then(() => runHomeJob(env)).then(() => log("ok", "")).catch((e) => log("error", String((e && e.stack) || e).slice(0, 500))));
   },
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -260,4 +260,62 @@ async function runArtJob(env) {
     saved.push(n + "|" + shots[i].t + "|" + shots[i].u);
   }
   await note("done", { id: prod.id, photos: saved.join(",") });
+}
+
+// TEMPORARY: create the home + backpack collection in Printful and save photos; removed after use.
+const RAW_H = "https://raw.githubusercontent.com/savagexartllc-ux/aether-atelier/main/print-files/home/";
+const HOME_ITEMS = [
+  { key: "helios-rug", name: "Helios Rising Area Rug 3x5", product: 924, variant: 23703, price: "149.00", files: { default: "helios-rising-rug-36x60.jpg" } },
+  { key: "iris-rug", name: "Iris Area Rug 5x3", product: 924, variant: 23706, price: "149.00", files: { default: "iris-rug-60x36.jpg" } },
+  { key: "gilded-rug", name: "Gilded Rain Area Rug 3x5", product: 924, variant: 23703, price: "149.00", files: { default: "gilded-rain-rug-36x60.jpg" } },
+  { key: "iris-blanket", name: "Iris Throw Blanket 50x60", product: 395, variant: 10986, price: "79.00", files: { default: "iris-blanket-50x60.jpg" } },
+  { key: "loop-blanket", name: "The Loop Theory Throw Blanket 50x60", product: 395, variant: 10986, price: "79.00", files: { default: "loop-blanket-50x60.jpg" } },
+  { key: "gilded-blanket", name: "Gilded Rain Throw Blanket 50x60", product: 395, variant: 10986, price: "79.00", files: { default: "gilded-rain-blanket-50x60.jpg" } },
+  { key: "iris-backpack", name: "Iris Backpack", product: 279, variant: 9063, price: "89.00", files: { default: "iris-backpack-front.jpg", top: "iris-backpack-top.jpg", bottom: "iris-backpack-bottom.jpg", pocket: "iris-backpack-pocket.jpg" } },
+  { key: "loop-backpack", name: "The Loop Theory Backpack", product: 279, variant: 9063, price: "89.00", files: { default: "loop-backpack-front.jpg", top: "loop-backpack-top.jpg", bottom: "loop-backpack-bottom.jpg", pocket: "loop-backpack-pocket.jpg" } },
+  { key: "iris-curtain", name: "Iris Blackout Curtain Panel", product: 1737, variant: 54570, price: "99.00", files: { default: "iris-curtain-50x84.jpg" } },
+  { key: "loop-curtain", name: "The Loop Theory Blackout Curtain Panel", product: 1737, variant: 54570, price: "99.00", files: { default: "loop-curtain-50x84.jpg" } },
+  { key: "gilded-curtain", name: "Gilded Rain Blackout Curtain Panel", product: 1737, variant: 54570, price: "99.00", files: { default: "gilded-rain-curtain-50x84.jpg" } },
+];
+async function runHomeJob(env) {
+  const rows = ((await env.STATS.prepare("SELECT item, status, product_id FROM jobs").all()).results || []);
+  const st = Object.fromEntries(rows.map((r) => [r.item, r]));
+  const it = HOME_ITEMS.find((x) => !st[x.key] || st[x.key].status !== "done");
+  if (!it) return;
+  const note = async (status, extra = {}) =>
+    env.STATS.prepare("INSERT INTO jobs (item, status, product_id, photos, note, updated) VALUES (?,?,?,?,?,?) ON CONFLICT(item) DO UPDATE SET status=excluded.status, product_id=COALESCE(excluded.product_id, jobs.product_id), photos=COALESCE(excluded.photos, jobs.photos), note=excluded.note, updated=excluded.updated")
+      .bind(it.key, status, extra.id ? String(extra.id) : null, extra.photos || null, extra.note || null, new Date().toISOString()).run();
+  const cur = st[it.key];
+  if (!cur || !cur.product_id) {
+    const body = { sync_product: { name: it.name }, sync_variants: [{ variant_id: it.variant, retail_price: it.price, files: Object.entries(it.files).map(([type, f]) => ({ type, url: RAW_H + f })) }] };
+    const cr = await (await pf(env, "/store/products", { method: "POST", body: JSON.stringify(body) })).json();
+    if (!cr.result) { await note("error", { note: JSON.stringify(cr).slice(0, 400) }); return; }
+    await note("created", { id: cr.result.id });
+    return;
+  }
+  const pfs = (await (await pf(env, "/mockup-generator/printfiles/" + it.product)).json()).result;
+  const vp = pfs.variant_printfiles.find((x) => x.variant_id == it.variant).placements;
+  const files = Object.entries(it.files).map(([type, f]) => {
+    const pl = type === "default" ? (vp.front ? "front" : Object.keys(vp)[0]) : type;
+    const pr = pfs.printfiles.find((p) => p.printfile_id == vp[pl]);
+    return { placement: pl, image_url: RAW_H + f, position: { area_width: pr.width, area_height: pr.height, width: pr.width, height: pr.height, top: 0, left: 0 } };
+  });
+  const t = await (await pf(env, "/mockup-generator/create-task/" + it.product, { method: "POST", body: JSON.stringify({ variant_ids: [it.variant], format: "jpg", files }) })).json();
+  if (!t.result) { await note("error", { note: "mockup " + JSON.stringify(t).slice(0, 300) }); return; }
+  let res;
+  for (let i = 0; i < 14; i++) {
+    await new Promise((r) => setTimeout(r, 5000));
+    res = (await (await pf(env, "/mockup-generator/task?task_key=" + t.result.task_key)).json()).result;
+    if (res && res.status !== "pending") break;
+  }
+  const shots = res && res.mockups ? res.mockups.flatMap((m) => [{ u: m.mockup_url, t: m.placement }, ...(m.extra || []).map((e) => ({ u: e.url, t: e.title || e.option }))]) : [];
+  if (!shots.length) { await note("error", { note: "no mockups " + JSON.stringify(res || {}).slice(0, 300) }); return; }
+  const saved = [];
+  for (let i = 0; i < shots.length && i < 8; i++) {
+    const b = await (await fetch(shots[i].u)).arrayBuffer();
+    const n = it.key + "-" + (i + 1) + ".jpg";
+    await env.MERCH_PHOTOS.put(n, b, { metadata: { type: "image/jpeg" } });
+    saved.push(n + "|" + shots[i].t + "|" + shots[i].u);
+  }
+  await note("done", { photos: saved.join(",") });
 }

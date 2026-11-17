@@ -1,0 +1,22 @@
+name: Fetch Printful catalog info
+on:
+  push:
+    paths: [".github/catalog-query.txt"]
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download listed public catalog endpoints
+        run: |
+          mkdir -p print-files/catalog
+          while read -r name path; do
+            [ -z "$name" ] && continue
+            curl -fsSL "https://api.printful.com$path" -o "print-files/catalog/$name.json" || echo "failed $name"
+          done < .github/catalog-query.txt
+      - name: Commit
+        run: |
+          git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"
+          git add print-files/catalog && git commit -m "Add Printful catalog info" && git push || echo "nothing new"

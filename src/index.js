@@ -206,6 +206,12 @@ const ART_ITEMS = [
   { key: "loop-hoodie", id: 493876096, from: 488799954, files: { back: "gs-the-loop-theory-back-v3.png", "*": "gs2-chest-dark-full.png" }, swap: ["back"] },
 ];
 async function runArtJob(env) {
+  const dims = await env.STATS.prepare("SELECT status FROM jobs WHERE item = 'dims'").first();
+  if (!dims) {
+    const out = {};
+    for (const id of [924, 279, 395, 1737, 963]) out[id] = (await (await pf(env, "/mockup-generator/printfiles/" + id)).json()).result;
+    await env.STATS.prepare("INSERT INTO jobs (item, status, photos, updated) VALUES ('dims','done',?,?)").bind(JSON.stringify(out), new Date().toISOString()).run();
+  }
   const done = new Set(((await env.STATS.prepare("SELECT item FROM jobs WHERE status = 'done'").all()).results || []).map((r) => r.item));
   const it = ART_ITEMS.find((x) => !done.has(x.key));
   if (!it) return;

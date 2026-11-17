@@ -266,9 +266,9 @@ async function runArtJob(env) {
 const RAW_H = "https://raw.githubusercontent.com/savagexartllc-ux/aether-atelier/main/print-files/home/";
 const HOME_ITEMS = [
   { key: "helios-rug", name: "Helios Rising Area Rug 3x5", product: 924, variant: 23703, price: "149.00", files: { default: "helios-rising-rug-36x60.jpg" } },
-  { key: "iris-rug", name: "Iris Area Rug 5x3", product: 924, variant: 23706, price: "149.00", files: { default: "iris-rug-60x36.jpg" } },
+  { key: "iris-rug", name: "Iris Area Rug 5x3", product: 924, variant: 23706, price: "149.00", files: { default: "iris-rug-60x36-v2.jpg" } },
   { key: "gilded-rug", name: "Gilded Rain Area Rug 3x5", product: 924, variant: 23703, price: "149.00", files: { default: "gilded-rain-rug-36x60.jpg" } },
-  { key: "iris-blanket", name: "Iris Throw Blanket 50x60", product: 395, variant: 10986, price: "79.00", files: { default: "iris-blanket-50x60.jpg" } },
+  { key: "iris-blanket", name: "Iris Throw Blanket 50x60", product: 395, variant: 10986, price: "79.00", files: { default: "iris-blanket-50x60-v2.jpg" } },
   { key: "loop-blanket", name: "The Loop Theory Throw Blanket 50x60", product: 395, variant: 10986, price: "79.00", files: { default: "loop-blanket-50x60.jpg" } },
   { key: "gilded-blanket", name: "Gilded Rain Throw Blanket 50x60", product: 395, variant: 10986, price: "79.00", files: { default: "gilded-rain-blanket-50x60.jpg" } },
   { key: "iris-backpack", name: "Iris Backpack", product: 279, variant: 9063, price: "89.00", files: { default: "iris-backpack-front.jpg", top: "iris-backpack-top.jpg", bottom: "iris-backpack-bottom.jpg", pocket: "iris-backpack-pocket.jpg" } },
@@ -292,6 +292,10 @@ async function runHomeJob(env) {
     if (!cr.result) { await note("error", { note: JSON.stringify(cr).slice(0, 400) }); return; }
     await note("created", { id: cr.result.id });
     return;
+  }
+  const mine = (await (await pf(env, "/store/products/" + cur.product_id)).json()).result;
+  for (const v of (mine && mine.sync_variants) || []) {
+    await pf(env, "/store/variants/" + v.id, { method: "PUT", body: JSON.stringify({ files: Object.entries(it.files).map(([type, f]) => ({ type, url: RAW_H + f })) }) });
   }
   const pfs = (await (await pf(env, "/mockup-generator/printfiles/" + it.product)).json()).result;
   const vp = pfs.variant_printfiles.find((x) => x.variant_id == it.variant).placements;

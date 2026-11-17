@@ -213,6 +213,9 @@ async function recordHit(request, env) {
 // TEMPORARY: add the Gilt Society. logo to the backpacks and refresh photos; removed after use.
 const RAW_H = "https://raw.githubusercontent.com/savagexartllc-ux/aether-atelier/main/print-files/home/";
 const HOME_ITEMS = [
+  { key: "iris-blanket-full", groups: ["Flat", "Flat 2", "Flat 3", "On Hanger"], name: "Iris Throw Blanket 50x60", product: 395, variant: 10986, price: "79.00", files: { default: "iris-blanket-50x60-v2.jpg" } },
+  { key: "loop-blanket-full", groups: ["Flat", "Flat 2", "Flat 3", "On Hanger"], name: "The Loop Theory Throw Blanket 50x60", product: 395, variant: 10986, price: "79.00", files: { default: "loop-blanket-50x60-v2.jpg" } },
+  { key: "gilded-blanket-full", groups: ["Flat", "Flat 2", "Flat 3", "On Hanger"], name: "Gilded Rain Throw Blanket 50x60", product: 395, variant: 10986, price: "79.00", files: { default: "gilded-rain-blanket-50x60-v2.jpg" } },
   { key: "iris-backpack", groups: ["Default", "Lifestyle", "Women's Lifestyle", "Men's Lifestyle", "Flat Lifestyle"], name: "Iris Backpack", product: 279, variant: 9063, price: "89.00", files: { default: "iris-backpack-front-v2.jpg", top: "iris-backpack-top.jpg", bottom: "iris-backpack-bottom.jpg", pocket: "iris-backpack-pocket.jpg" } },
   { key: "loop-backpack", groups: ["Default", "Lifestyle", "Women's Lifestyle", "Men's Lifestyle", "Flat Lifestyle"], name: "The Loop Theory Backpack", product: 279, variant: 9063, price: "89.00", files: { default: "loop-backpack-front-v2.jpg", top: "loop-backpack-top.jpg", bottom: "loop-backpack-bottom.jpg", pocket: "loop-backpack-pocket.jpg" } },
 ];

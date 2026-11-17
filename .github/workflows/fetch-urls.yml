@@ -1,0 +1,19 @@
+name: Fetch ad backdrops
+on:
+  push:
+    paths: [".github/fetch-urls.txt"]
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          mkdir -p print-files/rooms
+          while read -r name url; do
+            [ -z "$name" ] && continue
+            curl -fsSL "$url" -o "print-files/rooms/$name" || echo "failed $name"
+          done < .github/fetch-urls.txt
+          git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"
+          git add print-files/rooms && git commit -m "Add ad backdrops" && git push || echo "nothing new"

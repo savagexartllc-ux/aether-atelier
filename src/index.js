@@ -46,6 +46,9 @@ const SKU_TO_PRINTFUL = {
 };
 
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runMyOrder(env).catch((e) => env.STATS.prepare("INSERT INTO jobs (item, status, note, updated) VALUES ('my-order','error',?,?) ON CONFLICT(item) DO UPDATE SET note=excluded.note").bind(String(e).slice(0, 400), new Date().toISOString()).run()));
+  },
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/api/stripe-webhook") {
@@ -217,4 +220,20 @@ async function recordHit(request, env) {
   const item = kind === "buy" ? String(b.i || "").slice(0, 80) : null;
   await env.STATS.prepare("INSERT INTO hits (ts, day, kind, path, source, device, country, new_session, item) VALUES (?,?,?,?,?,?,?,?,?)")
     .bind(now.toISOString(), day, kind, path, source, device, country, b.s ? 1 : 0, item).run();
+}
+
+// TEMPORARY: create Lo's own order as a DRAFT in Printful (not confirmed, not charged); removed after use.
+async function runMyOrder(env) {
+  const done = await env.STATS.prepare("SELECT status FROM jobs WHERE item = 'my-order'").first();
+  if (done) return;
+  const items = [];
+  for (const id of [494866489, 489158135, 493868893, 493874379]) {
+    const p = (await (await pf(env, "/store/products/" + id)).json()).result;
+    items.push({ sync_variant_id: p.sync_variants[0].id, quantity: 1 });
+  }
+  const body = { external_id: "lo-personal-" + Date.now(), recipient: { name: "Lauren Collier", address1: "838 Silk Oak Terrace", city: "Lake Mary", state_code: "FL", country_code: "US", zip: "32746" }, items };
+  const r = await (await pf(env, "/orders", { method: "POST", body: JSON.stringify(body) })).json();
+  const res = r.result || {};
+  await env.STATS.prepare("INSERT INTO jobs (item, status, product_id, note, updated) VALUES ('my-order',?,?,?,?)")
+    .bind(res.status || "error", res.id ? String(res.id) : null, JSON.stringify(r.result ? { costs: res.costs, retail: res.retail_costs, items: (res.items || []).map((i) => i.name) } : r).slice(0, 1500), new Date().toISOString()).run();
 }

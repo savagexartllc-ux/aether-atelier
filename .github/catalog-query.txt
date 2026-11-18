@@ -1,7 +1,3 @@
-p924 /products/924
-p279 /products/279
-p395 /products/395
-p711 /products/711
-p1737 /products/1737
-p963 /products/963
-mg924 /mockup-generator/printfiles/924
+p358 /products/358
+p206 /products/206
+p961 /products/961

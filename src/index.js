@@ -46,9 +46,6 @@ const SKU_TO_PRINTFUL = {
 };
 
 export default {
-  async scheduled(event, env, ctx) {
-    ctx.waitUntil(runMyOrder(env).catch((e) => env.STATS.prepare("INSERT INTO jobs (item, status, note, updated) VALUES ('packing-slip','error',?,?) ON CONFLICT(item) DO UPDATE SET note=excluded.note").bind(String(e).slice(0, 400), new Date().toISOString()).run()));
-  },
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/api/stripe-webhook") {
@@ -220,15 +217,4 @@ async function recordHit(request, env) {
   const item = kind === "buy" ? String(b.i || "").slice(0, 80) : null;
   await env.STATS.prepare("INSERT INTO hits (ts, day, kind, path, source, device, country, new_session, item) VALUES (?,?,?,?,?,?,?,?,?)")
     .bind(now.toISOString(), day, kind, path, source, device, country, b.s ? 1 : 0, item).run();
-}
-
-// TEMPORARY: brand the Printful packing slip (logo + thank-you note); removed after use.
-async function runMyOrder(env) {
-  const done = await env.STATS.prepare("SELECT status FROM jobs WHERE item = 'packing-slip'").first();
-  if (done) return;
-  const body = { logo_url: "https://raw.githubusercontent.com/savagexartllc-ux/aether-atelier/main/print-files/b/gs2-chest-light.png", store_name: "Gilt Society.",
-    message: "Thank you for joining the Society. Every piece is made to order from Lauren's original paintings. Share yours and tag @giltsociety.co. aetheratelierco.com" };
-  const r = await (await pf(env, "/store/packing-slip", { method: "POST", body: JSON.stringify(body) })).json();
-  await env.STATS.prepare("INSERT INTO jobs (item, status, note, updated) VALUES ('packing-slip',?,?,?)")
-    .bind(r.code === 200 ? "done" : "error", JSON.stringify(r).slice(0, 1200), new Date().toISOString()).run();
 }

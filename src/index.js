@@ -58,6 +58,24 @@ export default {
       if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
       return handleStripe(request, env);
     }
+    if (url.pathname === "/api/pfcheck" && url.searchParams.get("fix") && env.PRINTFUL_TOKEN) {
+      // TEMPORARY one-time fix: re-point phone case print files at full-size art. Needs a one-time key stored in D1.
+      const k = await env.STATS.prepare("SELECT status FROM jobs WHERE item = 'casefix-key'").first();
+      if (!k || k.status !== url.searchParams.get("fix")) return new Response("no", { status: 403 });
+      await env.STATS.prepare("UPDATE jobs SET status = 'used' WHERE item = 'casefix-key'").run();
+      const RAW = "https://raw.githubusercontent.com/savagexartllc-ux/aether-atelier/main/print-files/gifts/";
+      const res = {};
+      for (const [key, file] of [["case-iris", "case-iris-v2.jpg"], ["case-loop", "case-loop-v2.jpg"]]) {
+        const d = await (await pf(env, "/store/products/" + SKU_TO_PRINTFUL[key])).json();
+        let ok = 0, bad = [];
+        for (const v of (d.result && d.result.sync_variants) || []) {
+          const r = await (await pf(env, "/store/variants/" + v.id, { method: "PUT", body: JSON.stringify({ files: [{ type: "default", url: RAW + file }] }) })).json();
+          if (r.result) ok++; else bad.push(JSON.stringify(r).slice(0, 120));
+        }
+        res[key] = { ok, bad: bad.slice(0, 3) };
+      }
+      return json(res);
+    }
     if (url.pathname === "/api/health" || url.pathname === "/api/pfcheck") {
       if (url.pathname === "/api/pfcheck") url.searchParams.set("pf", "gifts");
       const out = { ok: true, stripe: !!env.STRIPE_WEBHOOK_SECRET, printful: !!env.PRINTFUL_TOKEN,

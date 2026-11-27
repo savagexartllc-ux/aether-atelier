@@ -73,8 +73,12 @@ export default {
         for (const k of ["orn-iris", "case-iris", "case-loop"]) {
           const d = await (await pf(env, "/store/products/" + SKU_TO_PRINTFUL[k])).json();
           const v = (d.result && d.result.sync_variants) || [];
-          out.gifts[k] = { variants: v.length, sizes: v.map((x) => x.size).slice(0, 30), files: v.slice(0, 2).map((x) => (x.files || []).map((f) => ({ type: f.type, position: f.position || null, w: f.width, h: f.height }))) };
+          out.gifts[k] = { variants: v.length, sizes: v.map((x) => x.size).slice(0, 30), files: v.slice(0, 2).map((x) => (x.files || []).map((f) => ({ type: f.type, position: f.position || null, w: f.width, h: f.height }))),
+            previews: v.filter((x) => /13 mini|16 Pro$|17 Air|18 Pro Max/.test(x.size || "")).map((x) => ({ size: x.size, url: ((x.files || []).find((f) => f.type === "preview") || {}).preview_url })) };
         }
+        const pfs = (await (await pf(env, "/mockup-generator/printfiles/601")).json()).result || {};
+        out.case_printfiles = (pfs.printfiles || []).map((p) => [p.printfile_id, p.width, p.height]);
+        out.case_variant_files = (pfs.variant_printfiles || []).map((x) => [x.variant_id, x.placements && x.placements.default]);
       }
       return json(out);
     }

@@ -1,1 +1,3 @@
-room-curtain-1.jpg https://export-download.canva.com/7PI-8/DAHbIp7PI-8/-1/0/0001-4500744345935012282.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAQYCGKMUH4R7NKVBA%2F20261116%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261116T141638Z&X-Amz-Expires=47962&X-Amz-Signature=ce55d2879c39cc1580d1b3d05e05bb6e9c6a91bdf6671d3f1cbacef85a37ff95&X-Amz-SignedHeaders=host%3Bx-amz-expected-bucket-owner&response-expires=Tue%2C%2017%20Nov%202026%2003%3A36%3A00%20GMT
+gifts-check.json https://aetheratelierco.com/api/health?pf=gifts
+gift-card-page.html https://aetheratelierco.com/gift-card?s=cs_live_test123
+merch-live.html https://aetheratelierco.com/merch

@@ -58,7 +58,8 @@ export default {
       if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
       return handleStripe(request, env);
     }
-    if (url.pathname === "/api/health") {
+    if (url.pathname === "/api/health" || url.pathname === "/api/pfcheck") {
+      if (url.pathname === "/api/pfcheck") url.searchParams.set("pf", "gifts");
       const out = { ok: true, stripe: !!env.STRIPE_WEBHOOK_SECRET, printful: !!env.PRINTFUL_TOKEN,
         stripe_format_ok: String(env.STRIPE_WEBHOOK_SECRET || "").startsWith("whsec_") };
       if (url.searchParams.has("deep") && env.PRINTFUL_TOKEN) {

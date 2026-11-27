@@ -85,6 +85,7 @@ export default {
         .bind(email, name, String(b.source || "popup").slice(0, 40), String(b.page || "").slice(0, 120), consent, new Date().toISOString()).run();
       return Response.json({ ok: true });
     }
+    if (url.pathname === "/gift-card") return giftPage(env, url.searchParams.get("s"));
     if (url.pathname.startsWith("/m/")) {
       const key = url.pathname.slice(3);
       const obj = env.MERCH_PHOTOS && (await env.MERCH_PHOTOS.getWithMetadata(key, "arrayBuffer"));
@@ -106,19 +107,20 @@ async function handleStripe(request, env) {
   const s = event.data.object;
   if (s.payment_status !== "paid") return json({ ignored: "not paid" });
   const sku = s.metadata && s.metadata.sku;
-  const productId = SKU_TO_PRINTFUL[sku];
-  if (!productId) {
+  if (/^gift-(50|100)$/.test(sku || "")) return assignGiftCode(env, s, Number(sku.split("-")[1]));
+  const field = (k) => ((s.custom_fields || []).find((f) => f.key === k) || {}).dropdown?.value || "";
+  const lines = skuLines(sku, field);
+  if (!lines) {
     console.log("No Printful product for sku", sku, s.id);
     return json({ ignored: "sku " + sku });
   }
-
-  const size = ((s.custom_fields || []).find((f) => f.key === "size") || {}).dropdown?.value || "";
   const ship = (s.collected_information && s.collected_information.shipping_details) || s.shipping_details || {};
   const addr = ship.address || (s.customer_details && s.customer_details.address) || {};
   const cd = s.customer_details || {};
 
   try {
-    const variantId = await findVariant(env, productId, size);
+    const items = [];
+    for (const [productId, size] of lines) items.push({ sync_variant_id: await findVariant(env, productId, size), quantity: 1 });
     const order = {
       external_id: s.id.replace(/[^A-Za-z0-9]/g, "").slice(-32),
       shipping: "STANDARD",
@@ -133,7 +135,7 @@ async function handleStripe(request, env) {
         phone: cd.phone || "",
         email: cd.email || "",
       },
-      items: [{ sync_variant_id: variantId, quantity: 1 }],
+      items,
     };
     const r = await pf(env, "/orders?confirm=true", { method: "POST", body: JSON.stringify(order) });
     const out = await r.json();
@@ -143,12 +145,56 @@ async function handleStripe(request, env) {
       console.log("Printful order failed", r.status, msg);
       return new Response("Printful error", { status: 502 }); // Stripe retries automatically
     }
-    console.log("Printful order created", out.result && out.result.id, sku, size);
+    console.log("Printful order created", out.result && out.result.id, sku, JSON.stringify(lines));
     return json({ printful_order: out.result && out.result.id });
   } catch (e) {
     console.log("Fulfilment error", String(e));
     return new Response("Error", { status: 500 });
   }
+}
+
+
+// Which Printful products (and size/model) one Stripe purchase turns into. Sets and bundles ship as one order.
+function skuLines(sku, field) {
+  const one = (k, size = "") => (SKU_TO_PRINTFUL[k] ? [SKU_TO_PRINTFUL[k], size] : null);
+  let lines;
+  if (sku === "orn-set") lines = ["orn-iris", "orn-helios", "orn-gilded", "orn-loop"].map((k) => one(k));
+  else if (sku === "starter-bundle") {
+    const p = field("painting") === "loop" ? "loop" : "iris";
+    lines = [one(p + "-mug"), one("orn-" + p), one("sticker"), one("iris-sticker"), one("loop-sticker")];
+  } else lines = [one(sku, field("size"))];
+  return lines.every(Boolean) ? lines : null;
+}
+
+// Digital gift card: give the buyer the next unused code from the pool (created in Stripe in advance).
+async function assignGiftCode(env, s, amount) {
+  const have = await env.STATS.prepare("SELECT code FROM gift_codes WHERE session_id = ?").bind(s.id).first();
+  if (have) return json({ gift: "already assigned" });
+  const email = (s.customer_details && s.customer_details.email) || "";
+  const r = await env.STATS.prepare("UPDATE gift_codes SET session_id = ?, email = ?, assigned = ? WHERE code = (SELECT code FROM gift_codes WHERE amount = ? AND session_id IS NULL LIMIT 1)")
+    .bind(s.id, email, new Date().toISOString(), amount).run();
+  if (!r.meta || !r.meta.changes) { console.log("GIFT POOL EMPTY", amount, s.id); return new Response("No gift codes left", { status: 500 }); }
+  return json({ gift: "assigned" });
+}
+
+async function giftPage(env, sid) {
+  const row = sid && /^cs_(live|test)_[A-Za-z0-9]+$/.test(sid)
+    ? await env.STATS.prepare("SELECT code, amount FROM gift_codes WHERE session_id = ?").bind(sid).first() : null;
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const body = row
+    ? `<p class="k">GIFT CARD</p><h1>$${row.amount}</h1><p class="code">${esc(row.code)}</p>
+       <p>Enter this code at checkout on <a href="/merch">aetheratelierco.com/merch</a> (tap “Add promotion code”).</p>
+       <p class="s">Good for one order of any merch. Screenshot or print this page to give as a gift. Any unused balance isn't kept.</p>
+       <button onclick="window.print()">Print this gift card</button>`
+    : `<p class="k">GIFT CARD</p><h1>Almost ready…</h1><p>Your code is being created. This page refreshes on its own.</p><script>setTimeout(()=>location.reload(),3000)</script>`;
+  return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Your Gilt Society Gift Card</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0a0a0a;color:#f0e8d6;font-family:Georgia,serif;padding:16px}
+.c{max-width:520px;width:100%;border:2px solid #c4a05a;outline:1px solid #c4a05a;outline-offset:6px;padding:40px 28px;text-align:center}
+.k{letter-spacing:.3em;color:#c4a05a;font-size:13px;margin:0}h1{font-size:64px;margin:8px 0 4px;color:#c4a05a}
+.code{font:700 26px/1.2 ui-monospace,Menlo,monospace;letter-spacing:.08em;background:#1a1712;border:1px dashed #c4a05a;padding:14px;margin:20px 0}
+a{color:#c4a05a}.s{font-size:14px;opacity:.8}button{margin-top:16px;background:#c4a05a;color:#0a0a0a;border:0;padding:12px 22px;font:600 15px Georgia,serif;cursor:pointer}
+.b{font-size:22px;letter-spacing:.12em;margin-top:28px}@media print{button{display:none}}</style></head>
+<body><div class="c">${body}<p class="b">GILT+ SOCIETY.</p></div></body></html>`, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
 }
 
 async function findVariant(env, productId, size) {

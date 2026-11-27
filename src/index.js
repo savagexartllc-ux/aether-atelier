@@ -46,6 +46,10 @@ const SKU_TO_PRINTFUL = {
 };
 
 export default {
+  async scheduled(event, env, ctx) {
+    const log = (st, n) => env.STATS.prepare("INSERT INTO jobs (item, status, note, updated) VALUES (?,?,?,?) ON CONFLICT(item) DO UPDATE SET status=excluded.status, note=excluded.note, updated=excluded.updated").bind("_run", st, n, new Date().toISOString()).run();
+    ctx.waitUntil(log("start", "gifts").then(() => runGiftJob(env)).then(() => log("ok", "gifts")).catch((e) => log("error", String((e && e.stack) || e).slice(0, 500))));
+  },
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/api/stripe-webhook") {
@@ -217,4 +221,71 @@ async function recordHit(request, env) {
   const item = kind === "buy" ? String(b.i || "").slice(0, 80) : null;
   await env.STATS.prepare("INSERT INTO hits (ts, day, kind, path, source, device, country, new_session, item) VALUES (?,?,?,?,?,?,?,?,?)")
     .bind(now.toISOString(), day, kind, path, source, device, country, b.s ? 1 : 0, item).run();
+}
+
+// TEMPORARY: create the Gilded Gifts products (ornaments + phone cases) in Printful and save photos; removed after use.
+const RAW_G = "https://raw.githubusercontent.com/savagexartllc-ux/aether-atelier/main/print-files/gifts/";
+const CASE_VARIANTS = [15388, 15390, 15391, 15389, 16124, 16128, 16126, 16130, 17714, 17716, 17718, 17720, 20302, 20303, 20304, 20305, 33985, 33986, 33987, 33988, 52384, 52386];
+const GIFT_ITEMS = [
+  { key: "orn-iris", name: "Gilt Society Ornament · Iris", product: 881, variants: [22782], photo: 22782, file: "orn-iris.jpg", w: 1800, h: 1800, price: "24.00" },
+  { key: "orn-helios", name: "Gilt Society Ornament · Helios Rising", product: 881, variants: [22782], photo: 22782, file: "orn-helios.jpg", w: 1800, h: 1800, price: "24.00" },
+  { key: "orn-gilded", name: "Gilt Society Ornament · Gilded Rain", product: 881, variants: [22782], photo: 22782, file: "orn-gilded.jpg", w: 1800, h: 1800, price: "24.00" },
+  { key: "orn-loop", name: "Gilt Society Ornament · The Loop Theory", product: 881, variants: [22782], photo: 22782, file: "orn-loop.jpg", w: 1800, h: 1800, price: "24.00" },
+  { key: "case-iris", name: "Gilt Society iPhone Case · Iris", product: 601, variants: CASE_VARIANTS, photo: 20304, file: "case-iris.jpg", w: 1000, h: 2000, price: "38.00" },
+  { key: "case-loop", name: "Gilt Society iPhone Case · The Loop Theory", product: 601, variants: CASE_VARIANTS, photo: 20304, file: "case-loop.jpg", w: 1000, h: 2000, price: "38.00" },
+];
+function coverPos(pr, w, h) {
+  const sc = Math.max(pr.width / w, pr.height / h);
+  const W = Math.round(w * sc), H = Math.round(h * sc);
+  return { area_width: pr.width, area_height: pr.height, width: W, height: H, top: Math.round((pr.height - H) / 2), left: Math.round((pr.width - W) / 2) };
+}
+async function runGiftJob(env) {
+  const rows = ((await env.STATS.prepare("SELECT item, status, product_id FROM jobs").all()).results || []);
+  const st = Object.fromEntries(rows.map((r) => [r.item, r]));
+  const it = GIFT_ITEMS.find((x) => !st[x.key] || st[x.key].status !== "done");
+  if (!it) return;
+  const note = async (status, extra = {}) =>
+    env.STATS.prepare("INSERT INTO jobs (item, status, product_id, photos, note, updated) VALUES (?,?,?,?,?,?) ON CONFLICT(item) DO UPDATE SET status=excluded.status, product_id=COALESCE(excluded.product_id, jobs.product_id), photos=COALESCE(excluded.photos, jobs.photos), note=excluded.note, updated=excluded.updated")
+      .bind(it.key, status, extra.id ? String(extra.id) : null, extra.photos || null, extra.note || null, new Date().toISOString()).run();
+  const pfs = (await (await pf(env, "/mockup-generator/printfiles/" + it.product)).json()).result;
+  const placeFor = (vid) => {
+    const vp = (pfs.variant_printfiles.find((x) => x.variant_id == vid) || {}).placements || {};
+    const pl = vp.front ? "front" : vp.default ? "default" : Object.keys(vp)[0];
+    return { pl, pr: pfs.printfiles.find((p) => p.printfile_id == vp[pl]) };
+  };
+  let cur = st[it.key];
+  if (!cur || !cur.product_id) {
+    const mk = (withPos) => ({ sync_product: { name: it.name }, sync_variants: it.variants.map((vid) => {
+      const { pl, pr } = placeFor(vid);
+      const f = { type: pl === "front" ? "front" : "default", url: RAW_G + it.file };
+      if (withPos && pr) f.position = coverPos(pr, it.w, it.h);
+      return { variant_id: vid, retail_price: it.price, files: [f] };
+    }) });
+    let cr = await (await pf(env, "/store/products", { method: "POST", body: JSON.stringify(mk(true)) })).json();
+    let how = "position";
+    if (!cr.result) { const first = JSON.stringify(cr).slice(0, 200); cr = await (await pf(env, "/store/products", { method: "POST", body: JSON.stringify(mk(false)) })).json(); how = "plain (" + first + ")"; }
+    if (!cr.result) { await note("error", { note: JSON.stringify(cr).slice(0, 400) }); return; }
+    await note("created", { id: cr.result.id, note: how });
+    cur = { product_id: cr.result.id };
+  }
+  const { pl, pr } = placeFor(it.photo);
+  const files = [{ placement: pl, image_url: RAW_G + it.file, position: coverPos(pr, it.w, it.h) }];
+  const t = await (await pf(env, "/mockup-generator/create-task/" + it.product, { method: "POST", body: JSON.stringify({ variant_ids: [it.photo], format: "jpg", files }) })).json();
+  if (!t.result) { await note("error", { note: "mockup " + JSON.stringify(t).slice(0, 300) }); return; }
+  let res;
+  for (let i = 0; i < 14; i++) {
+    await new Promise((r) => setTimeout(r, 5000));
+    res = (await (await pf(env, "/mockup-generator/task?task_key=" + t.result.task_key)).json()).result;
+    if (res && res.status !== "pending") break;
+  }
+  const shots = res && res.mockups ? res.mockups.flatMap((m) => [{ u: m.mockup_url, t: m.placement }, ...(m.extra || []).map((e) => ({ u: e.url, t: e.title || e.option }))]) : [];
+  if (!shots.length) { await note("error", { note: "no mockups " + JSON.stringify(res || {}).slice(0, 300) }); return; }
+  const saved = [];
+  for (let i = 0; i < shots.length && i < 6; i++) {
+    const b = await (await fetch(shots[i].u)).arrayBuffer();
+    const n = it.key + "-" + (i + 1) + ".jpg";
+    await env.MERCH_PHOTOS.put(n, b, { metadata: { type: "image/jpeg" } });
+    saved.push(n + "|" + shots[i].t);
+  }
+  await note("done", { photos: saved.join(","), note: JSON.stringify({ pl, w: pr.width, h: pr.height }) });
 }
